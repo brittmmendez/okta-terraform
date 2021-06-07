@@ -13,7 +13,6 @@ terraform {
   required_version = ">= 0.13.4"
 }
 
-# Configure the AWS Provider
 provider "aws" {
   profile = "default"
   region  = "us-east-1"
@@ -22,12 +21,15 @@ provider "aws" {
 # Configure the Okta Provider
 provider "okta" {
   org_name  = "dev-123456"
-  base_url  = "oktapreview.com"
+  base_url  = "pgpoc.okta.com"
   api_token = "xxxx"
 }
 
-# need to figure out right resource to pull in
+# will need to set up okta resource is the correct resource?
+# https://registry.terraform.io/providers/okta/okta/latest/docs/resources/idp_oidc
 
+
+# set up appsync stuff
 resource "aws_iam_role" "appsync_role" {
   name               = "okta_appsync_terraform_api"
   assume_role_policy = file("${path.module}/templates/appsyncRole.json")
@@ -48,6 +50,7 @@ resource "aws_appsync_graphql_api" "example" {
 
   schema = file("${path.module}/templates/okta_appsync_terraform.graphql")
 
+  #  set up openid_connect for appsync with correct okta creds
   openid_connect_config {
     # will want to change issuer and reference okta resource we made above
     issuer = "https://example.com" 
