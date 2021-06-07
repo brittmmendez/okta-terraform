@@ -13,7 +13,6 @@ terraform {
   required_version = ">= 0.13.4"
 }
 
-
 # Configure the AWS Provider
 provider "aws" {
   profile = "default"
@@ -26,6 +25,8 @@ provider "okta" {
   base_url  = "oktapreview.com"
   api_token = "xxxx"
 }
+
+# need to figure out right resource to pull in
 
 resource "aws_iam_role" "appsync_role" {
   name               = "okta_appsync_terraform_api"
@@ -48,7 +49,8 @@ resource "aws_appsync_graphql_api" "example" {
   schema = file("${path.module}/templates/okta_appsync_terraform.graphql")
 
   openid_connect_config {
-    issuer = "https://example.com"
+    # will want to change issuer and reference okta resource we made above
+    issuer = "https://example.com" 
     # client_id = ""
   }
 }
