@@ -21,12 +21,21 @@ provider "aws" {
 # Configure the Okta Provider
 provider "okta" {}
 
-resource "okta_app_oauth" "brittany" {
-  label          = "brittany"
+resource "okta_app_oauth" "openID-connect" {
+  label          = "openID-connect"
   type           = "browser"
   grant_types    = ["authorization_code", "implicit"]
-  redirect_uris  = ["https://example.com/"]
+  redirect_uris  = ["http://localhost:8080/login/callback", "https://aws.amazon.com"]
+  login_uri      = "http://localhost:8080"
   response_types = ["token", "id_token", "code"]
+  # need token_endpoint_auth_method to be set to none for enabling PKCE flow
+  token_endpoint_auth_method = "none"
+}
+
+resource "okta_trusted_origin" "localhost" {
+  name   = "http://localhost:8080"
+  origin = "http://localhost:8080"
+  scopes = ["CORS"]
 }
 
 resource "aws_appsync_graphql_api" "okta-example-api" {
@@ -36,7 +45,9 @@ resource "aws_appsync_graphql_api" "okta-example-api" {
 
   openid_connect_config {
     issuer = "https://pgpoc.okta.com"
-    # client_id = ""
+    # comment out client_id if you want to open appsync api to all 
+    # applications in issuer andnot just a single one
+    client_id = okta_app_oauth.openID-connect.client_id
   }
 
   schema = file("${path.module}/templates/okta_appsync_terraform.graphql")
