@@ -5,7 +5,7 @@ terraform {
       version = "~> 3.27"
     }
     okta = {
-      source = "okta/okta"
+      source  = "okta/okta"
       version = "~> 3.10"
     }
   }
@@ -18,42 +18,157 @@ provider "aws" {
   region  = "us-east-1"
 }
 
-# Configure the Okta Provider
-provider "okta" {
-  org_name  = "dev-123456"
-  base_url  = "pgpoc.okta.com"
-  api_token = "xxxx"
-}
+# # Configure the Okta Provider
+# provider "okta" {}
 
-# will need to set up okta resource is the correct resource?
-# https://registry.terraform.io/providers/okta/okta/latest/docs/resources/idp_oidc
+# resource "okta_app_oauth" "brittany" {
+#   label          = "brittany"
+#   type           = "browser"
+#   grant_types    = ["authorization_code", "implicit"]
+#   redirect_uris  = ["https://example.com/"]
+#   response_types = ["token", "id_token", "code"]
+# }
 
 
-# set up appsync stuff
-resource "aws_iam_role" "appsync_role" {
-  name               = "okta_appsync_terraform_api"
-  assume_role_policy = file("${path.module}/templates/appsyncRole.json")
-}
 
-resource "aws_iam_role_policy" "appsync_role_policy" {
-  name = "okta_appsync_terraform_api_role_policy"
-  role = aws_iam_role.appsync_role.id
 
-  policy = templatefile("${path.module}/templates/appsyncPolicy.json", {
-    region     = "us-east-1",
-  })
-}
-
-resource "aws_appsync_graphql_api" "example" {
+resource "aws_appsync_graphql_api" "okta-example-api" {
+  name                = "okta-example"
   authentication_type = "OPENID_CONNECT"
-  name                = "okta_appsync_terraform"
 
-  schema = file("${path.module}/templates/okta_appsync_terraform.graphql")
 
-  #  set up openid_connect for appsync with correct okta creds
   openid_connect_config {
-    # will want to change issuer and reference okta resource we made above
-    issuer = "https://example.com" 
+    issuer = "https://pgpoc.okta.com"
     # client_id = ""
   }
+
+  schema = <<EOF
+type Mutation {
+    createPost(title: String!, description: String): Post
+}
+
+type Post {
+    id: ID!
+    title: String!
+    description: String
+    consumerId: ID
+}
+
+type Query {
+    listPosts: [Post]
+}
+
+schema {
+    query: Query
+    mutation: Mutation
+}
+EOF
+}
+
+resource "aws_appsync_datasource" "okta-example-datasource" {
+  api_id           = aws_appsync_graphql_api.okta-example-api.id
+  name             = "tf_appsync_example"
+  service_role_arn = aws_iam_role.okta-example-role.arn
+  type             = "AMAZON_DYNAMODB"
+
+  dynamodb_config {
+    table_name = aws_dynamodb_table.okta-example-table.name
+  }
+}
+
+resource "aws_appsync_resolver" "createPost_resolver" {
+  api_id      = aws_appsync_graphql_api.okta-example-api.id
+  field       = "createPost"
+  type        = "Mutation"
+  data_source = aws_appsync_datasource.okta-example-datasource.name
+
+  request_template = <<EOF
+{
+    "version": "2018-05-29",
+    "operation": "PutItem",
+    "key" : {
+        "id": $util.dynamodb.toDynamoDBJson($util.autoId()),
+        "consumerId": $util.dynamodb.toDynamoDBJson($ctx.identity.sub),
+    },
+    "attributeValues" : $util.dynamodb.toMapValuesJson($ctx.args)
+}
+EOF
+
+  response_template = <<EOF
+$util.toJson($ctx.result)
+EOF
+}
+
+resource "aws_appsync_resolver" "listPosts_resolver" {
+  api_id      = aws_appsync_graphql_api.okta-example-api.id
+  field       = "listPosts"
+  type        = "Query"
+  data_source = aws_appsync_datasource.okta-example-datasource.name
+
+  request_template = <<EOF
+{
+    "version": "2018-05-29",
+    "operation": "Scan",
+    "filter": #if($context.args.filter) $util.transform.toDynamoDBFilterExpression($ctx.args.filter) #else null #end,
+    "limit": $util.defaultIfNull($ctx.args.limit, 20),
+    "nextToken": $util.toJson($util.defaultIfNullOrEmpty($ctx.args.nextToken, null)),
+}
+EOF
+
+  response_template = <<EOF
+$util.toJson($context.result.items)
+EOF
+}
+
+resource "aws_dynamodb_table" "okta-example-table" {
+  name           = "example"
+  read_capacity  = 1
+  write_capacity = 1
+  hash_key       = "id"
+
+    attribute  {
+      name = "id"
+      type = "S"
+    }
+}
+
+resource "aws_iam_role" "okta-example-role" {
+  name = "example"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "appsync.amazonaws.com"
+      },
+      "Effect": "Allow"
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy" "okta-example-policy" {
+  name = "example"
+  role = aws_iam_role.okta-example-role.id
+
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "dynamodb:*"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "${aws_dynamodb_table.okta-example-table.arn}"
+      ]
+    }
+  ]
+}
+EOF
 }
