@@ -18,19 +18,16 @@ provider "aws" {
   region  = "us-east-1"
 }
 
-# # Configure the Okta Provider
-# provider "okta" {}
+# Configure the Okta Provider
+provider "okta" {}
 
-# resource "okta_app_oauth" "brittany" {
-#   label          = "brittany"
-#   type           = "browser"
-#   grant_types    = ["authorization_code", "implicit"]
-#   redirect_uris  = ["https://example.com/"]
-#   response_types = ["token", "id_token", "code"]
-# }
-
-
-
+resource "okta_app_oauth" "brittany" {
+  label          = "brittany"
+  type           = "browser"
+  grant_types    = ["authorization_code", "implicit"]
+  redirect_uris  = ["https://example.com/"]
+  response_types = ["token", "id_token", "code"]
+}
 
 resource "aws_appsync_graphql_api" "okta-example-api" {
   name                = "okta-example"
@@ -42,27 +39,7 @@ resource "aws_appsync_graphql_api" "okta-example-api" {
     # client_id = ""
   }
 
-  schema = <<EOF
-type Mutation {
-    createPost(title: String!, description: String): Post
-}
-
-type Post {
-    id: ID!
-    title: String!
-    description: String
-    consumerId: ID
-}
-
-type Query {
-    listPosts: [Post]
-}
-
-schema {
-    query: Query
-    mutation: Mutation
-}
-EOF
+  schema = file("${path.module}/templates/okta_appsync_terraform.graphql")
 }
 
 resource "aws_appsync_datasource" "okta-example-datasource" {
@@ -133,42 +110,16 @@ resource "aws_dynamodb_table" "okta-example-table" {
 }
 
 resource "aws_iam_role" "okta-example-role" {
-  name = "example"
+  name = "okta-example-role"
 
-  assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Action": "sts:AssumeRole",
-      "Principal": {
-        "Service": "appsync.amazonaws.com"
-      },
-      "Effect": "Allow"
-    }
-  ]
-}
-EOF
+  assume_role_policy = file("${path.module}/templates/appsyncRole.json")
 }
 
 resource "aws_iam_role_policy" "okta-example-policy" {
-  name = "example"
+  name = "octa-example-policy"
   role = aws_iam_role.okta-example-role.id
 
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Action": [
-        "dynamodb:*"
-      ],
-      "Effect": "Allow",
-      "Resource": [
-        "${aws_dynamodb_table.okta-example-table.arn}"
-      ]
-    }
-  ]
-}
-EOF
+  policy = templatefile("${path.module}/templates/appsyncPolicy.json", {
+    aws_dynamodb_table = "${aws_dynamodb_table.okta-example-table.arn}",
+  })
 }
