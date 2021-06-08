@@ -19,7 +19,11 @@ provider "aws" {
 }
 
 # Configure the Okta Provider
-provider "okta" {}
+provider "okta" {
+  org_name  = "pgpoc"
+  base_url  = "okta.com"
+  api_token = "00hGNid5bjIblkrppS8fUzjx1dFY9AOv68ACMLmLyM"
+}
 
 resource "okta_app_oauth" "openID-connect" {
   label          = "openID-connect"
@@ -32,6 +36,20 @@ resource "okta_app_oauth" "openID-connect" {
   token_endpoint_auth_method = "none"
 }
 
+# need to create a group 
+# this is used for self service registration and adds members who register here
+resource "okta_group" "openID-connect" {
+  name        = "openID-connect-group"
+  description = "This is an example group for users who create an account to be added to which in turn has access to oktc example app"
+}
+
+#assign group okta_app_oauth so users who creat accounts and are in that group have access to the app
+resource "okta_app_group_assignment" "openID-connect" {
+  app_id   = okta_app_oauth.openID-connect.id
+  group_id = okta_group.openID-connect.id
+}
+
+# create one for each uri that you want the app to be able to trust for sign in/registration
 resource "okta_trusted_origin" "localhost" {
   name   = "http://localhost:8080"
   origin = "http://localhost:8080"
