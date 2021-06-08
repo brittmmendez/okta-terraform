@@ -36,8 +36,7 @@ resource "okta_app_oauth" "openID-connect" {
   token_endpoint_auth_method = "none"
 }
 
-# need to create a group 
-# this is used for self service registration and adds members who register here
+# this group creation is used for self service registration and adds members who register here
 resource "okta_group" "openID-connect" {
   name        = "openID-connect-group"
   description = "This is an example group for users who create an account to be added to which in turn has access to oktc example app"
@@ -55,6 +54,8 @@ resource "okta_trusted_origin" "localhost" {
   origin = "http://localhost:8080"
   scopes = ["CORS"]
 }
+
+# TODO: see if there's a way to self-service-registration assign to group to add more apps. 
 
 resource "aws_appsync_graphql_api" "okta-example-api" {
   name                = "okta-example"
