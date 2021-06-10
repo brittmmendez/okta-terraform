@@ -19,11 +19,7 @@ provider "aws" {
 }
 
 # Configure the Okta Provider
-provider "okta" {
-  org_name  = "pgpoc"
-  base_url  = "okta.com"
-  api_token = "00hGNid5bjIblkrppS8fUzjx1dFY9AOv68ACMLmLyM"
-}
+provider "okta" {}
 
 resource "okta_app_oauth" "openID-connect" {
   label          = "openID-connect"
