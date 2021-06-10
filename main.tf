@@ -33,25 +33,29 @@ resource "okta_app_oauth" "openID-connect" {
 }
 
 # this group creation is used for self service registration and adds members who register here
+# QUESTION -- do I need this or shoudl all applications that we want to have self service for share the same group?
 resource "okta_group" "openID-connect" {
   name        = "openID-connect-group"
   description = "This is an example group for users who create an account to be added to which in turn has access to oktc example app"
 }
 
 #assign group okta_app_oauth so users who creat accounts and are in that group have access to the app
+# QUESTION -- If I shouldn't create a new group above, then the group ID below will need to be adjusted to always be the same value of the main group
 resource "okta_app_group_assignment" "openID-connect" {
   app_id   = okta_app_oauth.openID-connect.id
   group_id = okta_group.openID-connect.id
 }
 
-# create one for each uri that you want the app to be able to trust for sign in/registration
+# create one for each uri that you want their entore pg-poc account (not just for the app) to be able to trust for sign in/registration
+# no duplicates allowed, so its not on a per app basis rather an entire okta account
 resource "okta_trusted_origin" "localhost" {
   name   = "http://localhost:8080"
   origin = "http://localhost:8080"
   scopes = ["CORS"]
 }
 
-# TODO: see if there's a way to self-service-registration assign to group to add more apps. 
+# QUESTION: Is there a resource to assign self-service-registration to group. Now that is a manual process
+# Directory -> Self-Service Registration -> Edit -> set the correct group under Assign to group
 
 resource "aws_appsync_graphql_api" "okta-example-api" {
   name                = "okta-example"
@@ -142,7 +146,7 @@ resource "aws_iam_role" "okta-example-role" {
 }
 
 resource "aws_iam_role_policy" "okta-example-policy" {
-  name = "octa-example-policy"
+  name = "okta-example-policy"
   role = aws_iam_role.okta-example-role.id
 
   policy = templatefile("${path.module}/templates/appsyncPolicy.json", {
