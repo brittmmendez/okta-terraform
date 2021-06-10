@@ -27,6 +27,7 @@ resource "okta_app_oauth" "openID-connect" {
   grant_types    = ["authorization_code", "implicit"]
   redirect_uris  = ["http://localhost:8080/login/callback", "https://aws.amazon.com"]
   login_uri      = "http://localhost:8080"
+  post_logout_redirect_uris      = ["http://localhost:8080"]
   response_types = ["token", "id_token", "code"]
   # need token_endpoint_auth_method to be set to none for enabling PKCE flow
   token_endpoint_auth_method = "none"
